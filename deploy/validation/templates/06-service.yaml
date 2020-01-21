@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: validation-service
+  name: validation-service
+  namespace: marketplace
+spec:
+  ports:
+  - name: 5001-tcp
+    port: 5001
+    protocol: TCP
+    targetPort: 5001
+  selector:
+    app: validation-service
+    deploymentconfig: validation-service
+  sessionAffinity: None
+  type: ClusterIP

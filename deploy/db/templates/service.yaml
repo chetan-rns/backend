@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    template: postgresql-persistent-template
+    template.openshift.io/template-instance-owner: 6c361c58-2eca-11ea-8c5c-0a580a80002f
+  name: postgres
+  namespace: marketplace
+spec:
+  ports:
+  - name: postgresql
+    port: 5432
+    protocol: TCP
+    targetPort: 5432
+  selector:
+    name: postgres
+  sessionAffinity: None
+  type: ClusterIP

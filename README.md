@@ -1,5 +1,5 @@
-# backend# Backend Service
-Backend service provides REST APIs for the Pipelines-Marketplace UI to interact with the database. It also povides file service by caching the YAML and README files from the Github reposiory provided by the user. 
+# # Backend Service
+Backend service provides REST APIs for the Pipelines-Marketplace UI.
 
 ### Dependencies
 1. Go 1.11.3
@@ -15,8 +15,12 @@ POSTGRESQL_PASSWORD=""
 POSTGRESQL_DATABASE=""
 HOST=""
 PORT=
+CLIENT_ID=""
+CLIENT_SECRET=""
+VALIDATION_API=""
 ```
 Get your Github Access token from <https://github.com/settings/tokens> 
+Create client ID and secret for Github OAuth
 
 3. Install dependencies 
   ```go mod download```

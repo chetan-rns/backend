@@ -1,0 +1,34 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  labels:
+    app: validation-service
+  name: validation-service
+spec:
+  nodeSelector: null
+  output:
+    to:
+      kind: ImageStreamTag
+      name: validation-service:latest
+  postCommit: {}
+  resources: {}
+  source:
+    git:
+      uri: https://github.com/chetan-rns/validation-service
+    type: Git
+  strategy:
+    dockerStrategy:
+      from:
+        kind: ImageStreamTag
+        name: golang:1.12.14-stretch
+    type: Docker
+  triggers:
+  - github:
+      secret: xn-s6y2JGMzgDpOpO3O6
+    type: GitHub
+  - generic:
+      secret: fD5ob73AWtToiZ7NOP0D
+    type: Generic
+  - type: ConfigChange
+  - imageChange: {}
+    type: ImageChange

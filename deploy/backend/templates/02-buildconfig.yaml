@@ -1,0 +1,36 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  labels:
+    app: backend
+  name: backend
+spec:
+  nodeSelector: null
+  output:
+    to:
+      kind: ImageStreamTag
+      name: backend:latest
+  postCommit: {}
+  resources: {}
+  source:
+    git:
+      ref: pipelines
+      uri: https://github.com/chetan-rns/backend
+    type: Git
+  strategy:
+    dockerStrategy:
+      from:
+        kind: ImageStreamTag
+        name: golang:latest
+        namespace: openshift
+    type: Docker
+  triggers:
+  - github:
+      secret: xA4nvfzOR7581fOwNlPf
+    type: GitHub
+  - generic:
+      secret: LtmDKkCyu2ziRiaKhubE
+    type: Generic
+  - type: ConfigChange
+  - imageChange: {}
+    type: ImageChange

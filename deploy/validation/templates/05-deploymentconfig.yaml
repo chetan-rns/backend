@@ -1,0 +1,40 @@
+apiVersion: apps.openshift.io/v1
+kind: DeploymentConfig
+metadata:
+  labels:
+    app: validation-service
+  name: validation-service
+spec:
+  replicas: 1
+  selector:
+    app: validation-service
+    deploymentconfig: validation-service
+  strategy:
+    resources: {}
+  template:
+    metadata:
+      annotations:
+        openshift.io/generated-by: OpenShiftNewApp
+      creationTimestamp: null
+      labels:
+        app: validation-service
+        deploymentconfig: validation-service
+    spec:
+      containers:
+      - image: validation-service:latest
+        name: validation-service
+        ports:
+        - containerPort: 5001
+          protocol: TCP
+        resources: {}
+  test: false
+  triggers:
+  - type: ConfigChange
+  - imageChangeParams:
+      automatic: true
+      containerNames:
+      - validation-service
+      from:
+        kind: ImageStreamTag
+        name: validation-service:latest
+    type: ImageChange

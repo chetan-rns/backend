@@ -1,0 +1,30 @@
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+    labels:
+      app: validation-service
+    name: golang
+spec:
+    lookupPolicy:
+      local: false
+    tags:
+    - annotations:
+        openshift.io/imported-from: golang:1.12.14-stretch
+      from:
+        kind: DockerImage
+        name: golang:1.12.14-stretch
+      generation: null
+      importPolicy: {}
+      name: 1.12.14-stretch
+      referencePolicy:
+        type: ""
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+    labels:
+        app: validation-service
+    name: validation-service
+spec:
+    lookupPolicy:
+        local: false
