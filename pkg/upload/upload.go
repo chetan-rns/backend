@@ -114,13 +114,13 @@ func NewUpload(name string, description string, objectType string, tags []string
 		return map[string]interface{}{"status": false, "message": "Task with the given name doesn't exist"}
 	}
 	// Perform lint validation and schema validation here
-	validationResponse := validation(content, name, objectType)
-	log.Println(validationResponse.Status, validationResponse.Message)
-	if validationResponse.Status == false {
-		return map[string]interface{}{"status": validationResponse.Status, "message": validationResponse.Message}
-	}
+	// validationResponse := validation(content, name, objectType)
+	// log.Println(validationResponse.Status, validationResponse.Message)
+	// if validationResponse.Status == false {
+	// 	return map[string]interface{}{"status": validationResponse.Status, "message": validationResponse.Message}
+	// }
 	// Add Task details to DB
-	resource := models.Resource{
+	resource := models.ResourceResponse{
 		Name:        name,
 		Github:      github,
 		Description: description,
@@ -134,7 +134,13 @@ func NewUpload(name string, description string, objectType string, tags []string
 	}
 
 	// Add a raw path
-	models.AddResourceRawPath(rawResourcePath, resourceID, objectType)
+	resourceRawPath := models.ResourceRawPath{
+		ResourceID: resourceID,
+		RawPath:    rawResourcePath,
+		Type:       objectType,
+	}
+	resourceRawPath.Add()
+	// models.AddResourceRawPath(rawResourcePath, resourceID, objectType)
 
 	return map[string]interface{}{"status": true, "message": "Upload Successfull"}
 }
@@ -163,10 +169,10 @@ func doesResourceExist(paths []string, owner string, repositoryName string, reso
 // NewUploadPipeline handles uploading of new task/pipeline
 func NewUploadPipeline(name string, description string, objectType string, tags []string, github string, userID int) interface{} {
 	log.Println(objectType)
-	// isSameResource := models.CheckSameResourceUpload(userID, name)
-	// if isSameResource {
-	// 	return map[string]interface{}{"status": false, "message": objectType + " already exists"}
-	// }
+	isSameResource := models.CheckSameResourceUpload(userID, name)
+	if isSameResource {
+		return map[string]interface{}{"status": false, "message": objectType + " already exists"}
+	}
 	// Get owner and repository name from github link
 	owner, repositoryName := GetGithubOwner(github)
 	// Check if owner and repository name is valid
@@ -216,13 +222,13 @@ func NewUploadPipeline(name string, description string, objectType string, tags 
 	}
 	log.Println(rawTaskPaths)
 	// Perform lint validation and schema validation here
-	validationResponse := validation(content, name, objectType)
-	log.Println(validationResponse.Status, validationResponse.Message)
-	if validationResponse.Status == false {
-		return map[string]interface{}{"status": validationResponse.Status, "message": validationResponse.Message}
-	}
+	// validationResponse := validation(content, name, objectType)
+	// log.Println(validationResponse.Status, validationResponse.Message)
+	// if validationResponse.Status == false {
+	// 	return map[string]interface{}{"status": validationResponse.Status, "message": validationResponse.Message}
+	// }
 	// Add Pipeline details to DB
-	resource := models.Resource{
+	resourceResponse := models.ResourceResponse{
 		Name:        name,
 		Github:      github,
 		Description: description,
@@ -230,18 +236,30 @@ func NewUploadPipeline(name string, description string, objectType string, tags 
 		Type:        objectType,
 	}
 	rawResourcePath := fmt.Sprintf("https://raw.githubusercontent.com/%v/%v/%v/%v", owner, repositoryName, "master", resourcePath)
-	resourceID, err := models.AddResource(&resource, userID, owner, repositoryName, resourcePath)
+	resourceID, err := models.AddResource(&resourceResponse, userID, owner, repositoryName, resourcePath)
 	if err != nil {
 		log.Println(err)
 		return map[string]interface{}{"status": false, "message": err}
 	}
 
 	// Add a raw path for resource
-	models.AddResourceRawPath(rawResourcePath, resourceID, objectType)
+	resourceRawPath := models.ResourceRawPath{
+		ResourceID: resourceID,
+		RawPath:    rawResourcePath,
+		Type:       objectType,
+	}
+	resourceRawPath.Add()
+	// models.AddResourceRawPath(rawResourcePath, resourceID, objectType)
 
 	// Add raw paths of pipelines
 	for _, rawPath := range rawTaskPaths {
-		models.AddResourceRawPath(rawPath, resourceID, "task")
+		resourceRawPath := models.ResourceRawPath{
+			ResourceID: resourceID,
+			RawPath:    rawPath,
+			Type:       "task",
+		}
+		resourceRawPath.Add()
+		// models.AddResourceRawPath(rawPath, resourceID, "task")
 	}
 	return map[string]interface{}{"status": true, "message": "Upload Successfull"}
 }
@@ -318,16 +336,23 @@ func search(owner string, repositoryName string, objectType string, resourceName
 }
 
 func getGithubClientForUser(userID int) (*github.Client, context.Context) {
-	sqlStatement := `SELECT TOKEN FROM USER_CREDENTIAL WHERE ID=$1`
-	var token string
-	err := models.DB.QueryRow(sqlStatement, userID).Scan(&token)
-	if err != nil {
-		fmt.Println(err)
+	// sqlStatement := `SELECT TOKEN FROM USER_CREDENTIAL WHERE ID=$1`
+	// var token string
+	// err := models.DB.QueryRow(sqlStatement, userID).Scan(&token)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	return nil, nil
+	// }
+	user := models.UserCredential{}
+	res := models.DB.First(&user, userID)
+	if res.Error != nil {
+		fmt.Println(res.Error)
 		return nil, nil
 	}
+	log.Println(user.Token)
 	ctx := context.Background()
 	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: token},
+		&oauth2.Token{AccessToken: "c3ed7ada95145da8822103c86cbabeb4c503fa98"},
 	)
 	tc := oauth2.NewClient(ctx, ts)
 	client := github.NewClient(tc)

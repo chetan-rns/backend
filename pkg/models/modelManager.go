@@ -2,7 +2,6 @@ package models
 
 import (
 	"bufio"
-	"database/sql"
 	"fmt"
 	"log"
 	"os"
@@ -12,16 +11,25 @@ import (
 	"github.com/Pipelines-Marketplace/backend/pkg/polling"
 	"github.com/Pipelines-Marketplace/backend/pkg/utility"
 	"github.com/google/go-github/github"
+	"github.com/jinzhu/gorm"
+	"github.com/joho/godotenv"
+
+	// postgres import for gorm
+	_ "github.com/jinzhu/gorm/dialects/postgres"
 
 	// Blank for package side effect
 	_ "github.com/lib/pq"
 )
 
 // DB is a PostgreSQL object
-var DB *sql.DB
+var DB *gorm.DB
 
 // StartConnection will start a new database connection
 func StartConnection() error {
+	err := godotenv.Load()
+	if err != nil {
+		log.Println("Error loading .env file")
+	}
 	portString, _ := strconv.Atoi(os.Getenv("PORT"))
 	var (
 		host     = os.Getenv("HOST")
@@ -33,14 +41,17 @@ func StartConnection() error {
 	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
 		"password=%s dbname=%s sslmode=disable",
 		host, port, user, password, dbname)
+
 	// Connect to PostgreSQL on Openshift
-	db, err := sql.Open("postgres", psqlInfo)
-	DB = db
+	// db, err := sql.Open("postgres", psqlInfo)
+	db, err := gorm.Open("postgres", psqlInfo)
 	if err != nil {
 		return err
 	}
+	DB = db
+	DB.SingularTable(true)
 	// defer db.Close()
-	err = DB.Ping()
+	// err = DB.Ping()
 	if err != nil {
 		return err
 	}
@@ -101,21 +112,36 @@ func AddResourcesFromCatalog(owner string, repositoryName string) {
 			if err != nil {
 				log.Println(err)
 			}
-			addGithubDetails(resourceID, owner, repositoryName, "")
+			githubDetail := GithubDetail{
+				ResourceID:     resourceID,
+				Owner:          owner,
+				RepositoryName: repositoryName,
+				ReadmePath:     "",
+			}
+			githubDetail.Add()
+			// addGithubDetails(resourceID, owner, repositoryName, "")
 			// Iterate over all files in directory
 			for _, file := range d {
 				resourcePath := dir.GetName() + "/" + file.GetName()
 				if strings.HasSuffix(file.GetName(), ".yaml") {
 					// Store the path of file
-					updateGithubYAMLDetails(resourceID, resourcePath)
+					// updateGithubYAMLDetails(resourceID, resourcePath)
+					githubDetail.Update("path", resourcePath)
 					log.Println(dir.GetName() + " " + file.GetName())
 					// Store the raw file path
 					rawResourcePath := fmt.Sprintf("https://raw.githubusercontent.com/%v/%v/%v/%v", owner, repositoryName, "master", resourcePath)
-					AddResourceRawPath(rawResourcePath, resourceID, "Task")
+					// AddResourceRawPath(rawResourcePath, resourceID, "Task")
+					resourceRawPath := ResourceRawPath{
+						ResourceID: resourceID,
+						RawPath:    rawResourcePath,
+						Type:       "Task",
+					}
+					resourceRawPath.Add()
 				} else if strings.HasSuffix(file.GetName(), ".md") {
 					// Store the path of README file
 					log.Println(dir.GetName() + " " + file.GetName())
-					updateGithubREADMEDetails(resourceID, resourcePath)
+					// updateGithubREADMEDetails(resourceID, resourcePath)
+					githubDetail.Update("readme_path", resourcePath)
 				}
 			}
 		}
@@ -123,50 +149,50 @@ func AddResourcesFromCatalog(owner string, repositoryName string) {
 	log.Println("Done!")
 }
 
-// UpdateResourcesFromCatalog will add contents from Github catalog to database
-func UpdateResourcesFromCatalog(owner string, repositoryName string) {
-	// Get all directories
-	repoContents, err := polling.GetDirContents(utility.Ctx, utility.Client, owner, repositoryName, "", nil)
-	if err != nil {
-		log.Println(err)
-	}
-	for _, dir := range repoContents {
-		if utility.IsValidDirectory(dir) {
-			d, err := polling.GetDirContents(utility.Ctx, utility.Client, owner, repositoryName, dir.GetName(), nil)
-			if err != nil {
-				log.Println(err)
-			}
-			// Add the resource to DB
-			resource := Resource{
-				Name:      dir.GetName(),
-				Rating:    0.0,
-				Downloads: 0.0,
-				Github:    "http://github.com/" + owner + "/" + repositoryName,
-				Verified:  true,
-			}
-			var resourceID int
-			// Check if the resource already exists
-			if !resourceExists(resource.Name) {
-				resourceID, err = AddCatalogResource(&resource)
-				if err != nil {
-					log.Println(err)
-				}
-				// Iterate over all files in directory
-				for _, file := range d {
-					resourcePath := dir.GetName() + "/" + file.GetName()
-					addGithubDetails(resourceID, owner, repositoryName, "")
-					if strings.HasSuffix(file.GetName(), ".yaml") {
-						// Store the path of file
-						updateGithubYAMLDetails(resourceID, resourcePath)
-						// Store the raw file path
-						rawResourcePath := fmt.Sprintf("https://raw.githubusercontent.com/%v/%v/%v/%v", owner, repositoryName, "master", resourcePath)
-						AddResourceRawPath(rawResourcePath, resourceID, "Task")
-					} else if strings.HasSuffix(file.GetName(), ".md") {
-						// Store the path of README file
-						updateGithubREADMEDetails(resourceID, resourcePath)
-					}
-				}
-			}
-		}
-	}
-}
+// // UpdateResourcesFromCatalog will add contents from Github catalog to database
+// func UpdateResourcesFromCatalog(owner string, repositoryName string) {
+// 	// Get all directories
+// 	repoContents, err := polling.GetDirContents(utility.Ctx, utility.Client, owner, repositoryName, "", nil)
+// 	if err != nil {
+// 		log.Println(err)
+// 	}
+// 	for _, dir := range repoContents {
+// 		if utility.IsValidDirectory(dir) {
+// 			d, err := polling.GetDirContents(utility.Ctx, utility.Client, owner, repositoryName, dir.GetName(), nil)
+// 			if err != nil {
+// 				log.Println(err)
+// 			}
+// 			// Add the resource to DB
+// 			resource := Resource{
+// 				Name:      dir.GetName(),
+// 				Rating:    0.0,
+// 				Downloads: 0.0,
+// 				Github:    "http://github.com/" + owner + "/" + repositoryName,
+// 				Verified:  true,
+// 			}
+// 			var resourceID int
+// 			// Check if the resource already exists
+// 			if !resourceExists(resource.Name) {
+// 				resourceID, err = AddCatalogResource(&resource)
+// 				if err != nil {
+// 					log.Println(err)
+// 				}
+// 				// Iterate over all files in directory
+// 				for _, file := range d {
+// 					resourcePath := dir.GetName() + "/" + file.GetName()
+// 					addGithubDetails(resourceID, owner, repositoryName, "")
+// 					if strings.HasSuffix(file.GetName(), ".yaml") {
+// 						// Store the path of file
+// 						updateGithubYAMLDetails(resourceID, resourcePath)
+// 						// Store the raw file path
+// 						rawResourcePath := fmt.Sprintf("https://raw.githubusercontent.com/%v/%v/%v/%v", owner, repositoryName, "master", resourcePath)
+// 						AddResourceRawPath(rawResourcePath, resourceID, "Task")
+// 					} else if strings.HasSuffix(file.GetName(), ".md") {
+// 						// Store the path of README file
+// 						updateGithubREADMEDetails(resourceID, resourcePath)
+// 					}
+// 				}
+// 			}
+// 		}
+// 	}
+// }

@@ -6,15 +6,35 @@ import (
 	"log"
 )
 
-// TaskTags represents many-many between Task and Tag models
-type TaskTags struct {
-	TaskID int `json:"taskID"`
-	TagID  int `json:"tagID"`
+// import (
+// 	"database/sql"
+// 	"fmt"
+// 	"log"
+// )
+
+// // TaskTags represents many-many between Task and Tag models
+// type TaskTags struct {
+// 	TaskID int `json:"taskID"`
+// 	TagID  int `json:"tagID"`
+// }
+
+// ResourceTag represents ResourceTag table in DB
+type ResourceTag struct {
+	ResourceID int
+	TagID      int
+}
+
+// Add a new resource tag
+func (resourceTag *ResourceTag) Add() {
+	res := DB.Create(resourceTag)
+	if res.Error != nil {
+		log.Println(res.Error)
+	}
 }
 
 // GetAllResourcesWithGivenTags queries for all resources with given tags
-func GetAllResourcesWithGivenTags(resourceType string, verified string, tags []string) []Resource {
-	resources := []Resource{}
+func GetAllResourcesWithGivenTags(resourceType string, verified string, tags []string) []ResourceResponse {
+	resources := []ResourceResponse{}
 	args := make([]interface{}, len(tags))
 	for index, value := range tags {
 		args[index] = value
@@ -42,8 +62,9 @@ func GetAllResourcesWithGivenTags(resourceType string, verified string, tags []s
 		if err != nil {
 			log.Println(err)
 		}
-		resource.Tags = resourceTagMap[resource.ID]
-		matchTypeAndVerified(resourceType, verified, resource, &resources)
+		resourceResponse := resource.GetResourceResponse()
+		resourceResponse.Tags = resourceTagMap[resource.ID]
+		matchTypeAndVerified(resourceType, verified, resourceResponse, &resources)
 	}
 	return resources
 }
@@ -60,17 +81,17 @@ func executeTagsQuery(tags []string, params string, args []interface{}) (*sql.Ro
 	FROM RESOURCE AS T JOIN RESOURCE_TAG AS TT ON (T.ID=TT.RESOURCE_ID) JOIN TAG
 	AS TG ON (TG.ID=TT.TAG_ID AND TG.NAME in (` +
 			params + `));`
-		rows, err = DB.Query(sqlStatement, args...)
+		rows, err = DB.Raw(sqlStatement, args...).Rows()
 	} else {
 		sqlStatement = `
 	SELECT DISTINCT T.ID,T.NAME,T.TYPE,T.DESCRIPTION,T.DOWNLOADS,T.RATING,T.GITHUB,T.VERIFIED
 	FROM RESOURCE T`
-		rows, err = DB.Query(sqlStatement)
+		rows, err = DB.Raw(sqlStatement).Rows()
 	}
 	return rows, err
 }
 
-func matchTypeAndVerified(resourceType string, verified string, resource Resource, resources *[]Resource) {
+func matchTypeAndVerified(resourceType string, verified string, resource ResourceResponse, resources *[]ResourceResponse) {
 	isVerified := getBoolString(resource.Verified)
 	if resourceType != "all" && verified != "all" {
 		if resourceType == resource.Type && isVerified == verified {
@@ -100,18 +121,19 @@ func getBoolString(p bool) string {
 
 func getResourceTagMap() map[int][]string {
 	sqlStatement := `SELECT DISTINCT T.ID,TG.NAME FROM RESOURCE AS T JOIN RESOURCE_TAG AS TT ON (T.ID=TT.RESOURCE_ID) JOIN TAG AS TG ON (TG.ID=TT.TAG_ID);`
-	rows, err := DB.Query(sqlStatement)
+	// rows, err := DB.Query(sqlStatement)
+	rows, err := DB.Raw(sqlStatement).Rows()
 	// mapping task ID with tag names
-	var taskTagMap map[int][]string
-	taskTagMap = make(map[int][]string)
+	var resourceTagMap map[int][]string
+	resourceTagMap = make(map[int][]string)
 	for rows.Next() {
-		var taskID int
+		var resourceID int
 		var tagName string
-		err = rows.Scan(&taskID, &tagName)
+		err = rows.Scan(&resourceID, &tagName)
 		if err != nil {
 			log.Println(err)
 		}
-		taskTagMap[taskID] = append(taskTagMap[taskID], tagName)
+		resourceTagMap[resourceID] = append(resourceTagMap[resourceID], tagName)
 	}
-	return taskTagMap
+	return resourceTagMap
 }
